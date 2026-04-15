@@ -250,6 +250,9 @@ private:
 
 	uint8_t transmissionStatus = 0;
 
+bool _begun = false;
+
+void syncPortModeState();
 
 };
 

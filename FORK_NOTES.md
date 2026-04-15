@@ -1,31 +1,23 @@
-# PCF8575 INPUT fix fork
+# PCF8575 input fix fork
 
-Base project: xreef/PCF8575_library
+This fork fixes three input-related issues in the upstream library:
 
-## Problem fixed
+1. `readBuffer()` updated the input buffer only when pull-down and pull-up conditions were both true. It now updates when either condition is true.
+2. `digitalRead()` no longer clears the buffered bit after a read. That old behavior made reads edge-like instead of returning the current level.
+3. `pinMode(INPUT)` and `pinMode(INPUT_PULLUP)` now actively release the PCF8575 pin by writing `1` to the expander bit and synchronizing the port state immediately after mode changes. This is required by the PCF8575 quasi-bidirectional architecture, otherwise a pin can stay driven low and a button-to-GND with pull-up never reads HIGH correctly.
 
-For pins configured as `INPUT` and used with an external pull-up resistor (button to GND / active-low), `digitalRead()` could incorrectly keep returning `LOW`.
+## Practical effect
 
-## Root causes
+A button wired from the PCF8575 pin to GND with a pull-up to VCC now behaves as expected:
+- idle = HIGH
+- pressed = LOW
 
-1. `readBuffer()` updated the input buffer only when **both** conditions were true at the same time:
-   - a pull-down style input was HIGH, and
-   - a pull-up style input was LOW.
+## Recommended usage
 
-   This should be logical OR, not AND.
+```cpp
+pcf8575.pinMode(P0, INPUT);
+// external pull-up resistor to VCC, button to GND
 
-2. `digitalRead()` consumed the buffered level after a read by flipping the bit in `byteBuffered`. That made the API behave like an event latch instead of returning the current stable pin state.
-
-## Changes
-
-- `PCF8575.cpp`
-  - Changed the condition in `readBuffer()` from `and` to `||`.
-  - Removed buffer-bit clearing in `digitalRead()` so repeated reads reflect the actual current level.
-
-## Expected behavior after fix
-
-- `INPUT` pin + external pull-up + button to GND:
-  - released button -> `HIGH`
-  - pressed button -> `LOW`
-
-- repeated `digitalRead()` calls now return the actual level instead of dropping back to `LOW` because of internal buffer mutation.
+// or
+pcf8575.pinMode(P0, INPUT_PULLUP);
+```

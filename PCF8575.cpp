@@ -238,6 +238,8 @@ if (writeMode>0 || readMode>0){
 	this->transmissionStatus = _wire->endTransmission();
 }
 
+	_begun = true;
+
 	// If using interrupt set interrupt value to pin
 //	if (_usingInterrupt){
 //		DEBUG_PRINTLN("Using interrupt pin (not all pin is interrupted)");
@@ -253,6 +255,26 @@ if (writeMode>0 || readMode>0){
 	return this->isLastTransmissionSuccess();
 }
 
+
+void PCF8575::syncPortModeState(){
+	if (!_begun){
+		return;
+	}
+
+	// PCF8575 uses quasi-bidirectional I/O: every pin configured as input
+	// must be written HIGH to release the line. Otherwise the expander keeps
+	// actively pulling the pin low and external pull-ups/buttons-to-GND never read correctly.
+	uint16_t portState = (writeByteBuffered & writeMode) | readMode;
+	resetInitial = portState;
+	initialBuffer = (initialBuffer & ~readMode) | (portState & readMode);
+	byteBuffered = (byteBuffered & ~readMode) | (portState & readMode);
+
+	_wire->beginTransmission(_address);
+	_wire->write((uint8_t) portState);
+	_wire->write((uint8_t) (portState >> 8));
+	this->transmissionStatus = _wire->endTransmission();
+}
+
 /**
  * Set if fin is OUTPUT or INPUT
  * @param pin: pin to set
@@ -266,20 +288,24 @@ void PCF8575::pinMode(uint8_t pin, uint8_t mode, uint8_t output_start){
 
 	if (mode == OUTPUT){
 		writeMode = writeMode | bit(pin);
+		readMode =  readMode & ~bit(pin);
+		readModePullDown = readModePullDown & ~bit(pin);
+		readModePullUp = readModePullUp & ~bit(pin);
+
 		if (output_start==HIGH) {
 			writeModeUp = writeModeUp | bit(pin);
+			writeByteBuffered = writeByteBuffered | bit(pin);
+			byteBuffered = byteBuffered | bit(pin);
+		} else {
+			writeModeUp = writeModeUp & ~bit(pin);
+			writeByteBuffered = writeByteBuffered & ~bit(pin);
+			byteBuffered = byteBuffered & ~bit(pin);
 		}
-
-		//writeMode = writeMode | bit(pin);
-		readMode =  readMode & ~bit(pin);
-		readModePullDown 	=	readModePullDown 	& 	~bit(pin);
-		readModePullUp 		=	readModePullUp 		& 	~bit(pin);
 
 		DEBUG_PRINT("W: ");
 		DEBUG_PRINT(writeMode, BIN);
 		DEBUG_PRINT(" R ALL: ");
 		DEBUG_PRINT(readMode, BIN);
-
 		DEBUG_PRINT(" R Down: ");
 		DEBUG_PRINT(readModePullDown, BIN);
 		DEBUG_PRINT("R Up: ");
@@ -287,42 +313,52 @@ void PCF8575::pinMode(uint8_t pin, uint8_t mode, uint8_t output_start){
 
 	}else if (mode == INPUT){
 		writeMode = writeMode & ~bit(pin);
+		readMode = readMode | bit(pin);
+		readModePullDown = readModePullDown | bit(pin);
+		readModePullUp = readModePullUp & ~bit(pin);
 
-		readMode 			=   readMode 			| bit(pin);
-		readModePullDown 	=	readModePullDown 	| bit(pin);
-		readModePullUp 		=	readModePullUp 		& ~bit(pin);
+		// Release the quasi-bidirectional pin so an external pull-up can drive it HIGH.
+		writeByteBuffered = writeByteBuffered | bit(pin);
+		byteBuffered = byteBuffered | bit(pin);
+		resetInitial = resetInitial | bit(pin);
+		initialBuffer = initialBuffer | bit(pin);
 
 		DEBUG_PRINT("W: ");
 		DEBUG_PRINT(writeMode, BIN);
 		DEBUG_PRINT(" R ALL: ");
 		DEBUG_PRINT(readMode, BIN);
-
 		DEBUG_PRINT(" R Down: ");
 		DEBUG_PRINT(readModePullDown, BIN);
 		DEBUG_PRINT("R Up: ");
 		DEBUG_PRINTLN(readModePullUp, BIN);
+
 	}else if (mode == INPUT_PULLUP){
 		writeMode = writeMode & ~bit(pin);
+		readMode = readMode | bit(pin);
+		readModePullDown = readModePullDown & ~bit(pin);
+		readModePullUp = readModePullUp | bit(pin);
 
-		readMode 			=   readMode 			| bit(pin);
-		readModePullDown 	=	readModePullDown 	& ~bit(pin);
-		readModePullUp 		=	readModePullUp 		| bit(pin);
+		// INPUT_PULLUP must also write HIGH to the expander.
+		writeByteBuffered = writeByteBuffered | bit(pin);
+		byteBuffered = byteBuffered | bit(pin);
+		resetInitial = resetInitial | bit(pin);
+		initialBuffer = initialBuffer | bit(pin);
 
 		DEBUG_PRINT("W: ");
 		DEBUG_PRINT(writeMode, BIN);
 		DEBUG_PRINT(" R ALL: ");
 		DEBUG_PRINT(readMode, BIN);
-
 		DEBUG_PRINT(" R Down: ");
 		DEBUG_PRINT(readModePullDown, BIN);
 		DEBUG_PRINT("R Up: ");
 		DEBUG_PRINTLN(readModePullUp, BIN);
-	}
-	else{
+	}else{
 		DEBUG_PRINTLN("Mode non supported by PCF8575")
 	}
 	DEBUG_PRINT("Write mode: ");
 	DEBUG_PRINTLN(writeMode, BIN);
+
+	PCF8575::syncPortModeState();
 
 };
 
