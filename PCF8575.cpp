@@ -374,9 +374,10 @@ void PCF8575::readBuffer(bool force){
 		{
 			uint16_t iInput = _wire->read();// Read a uint16_t
 			iInput |= _wire->read() << 8;// Read a uint16_t
-			if ((readModePullDown & iInput)>0 || (readModePullUp & ~iInput)>0){
-				byteBuffered = (byteBuffered & ~readMode) | (uint16_t)iInput;
-			}
+			// Update all input bits unconditionally.
+			// A plain INPUT pin may be externally pulled either HIGH or LOW,
+			// so low-level buttons with an external pull-up must also propagate LOW.
+			byteBuffered = (byteBuffered & ~readMode) | (((uint16_t)iInput) & readMode);
 		}
 	}
 }
@@ -393,23 +394,11 @@ void PCF8575::readBuffer(bool force){
 		lastReadMillis = millis();
 		if(_wire->available())   // If uint16_ts are available to be recieved
 		{
-			  DEBUG_PRINTLN("Data ready");
-			  uint16_t iInput = _wire->read();// Read a uint16_t
-				iInput |= _wire->read() << 8;// Read a uint16_t
-
-				  if ((readModePullDown & iInput)>0 or (readModePullUp & ~iInput)>0){
-					  DEBUG_PRINT(" -------- CHANGE --------- ");
-					  byteBuffered = (byteBuffered & ~readMode) | (uint16_t)iInput;
-				  }
-
-//			  if ((iInput & readMode)>0){
-//				  DEBUG_PRINT("Input ");
-//				  DEBUG_PRINTLN((uint16_t)iInput, BIN);
-//
-//				  byteBuffered = byteBuffered | (uint16_t)iInput;
-//				  DEBUG_PRINT("byteBuffered ");
-//				  DEBUG_PRINTLN(byteBuffered, BIN);
-//			  }
+			DEBUG_PRINTLN("Data ready");
+			uint16_t iInput = _wire->read();// Read a uint16_t
+			iInput |= _wire->read() << 8;// Read a uint16_t
+			DEBUG_PRINT(" -------- READ INPUTS --------- ");
+			byteBuffered = (byteBuffered & ~readMode) | (((uint16_t)iInput) & readMode);
 		}
 
 		DEBUG_PRINT("Buffer value ");
@@ -431,10 +420,7 @@ void PCF8575::readBuffer(bool force){
 		if ((bit(13) & readMode)>0) digitalInput.p15 = ((byteBuffered & bit(13))>0)?HIGH:LOW;
 		if ((bit(14) & readMode)>0) digitalInput.p16 = ((byteBuffered & bit(14))>0)?HIGH:LOW;
 		if ((bit(15) & readMode)>0) digitalInput.p17 = ((byteBuffered & bit(15))>0)?HIGH:LOW;
-
-
-		// CORREZIONE: mappare anche i pin di writeMode sulla stessa nomenclatura (p00..p07, p10..p17)
-        if ((bit(0) & writeMode)>0) digitalInput.p00 = ((writeByteBuffered & bit(0))>0)?HIGH:LOW;
+		if ((bit(0) & writeMode)>0) digitalInput.p00 = ((writeByteBuffered & bit(0))>0)?HIGH:LOW;
 		if ((bit(1) & writeMode)>0) digitalInput.p01 = ((writeByteBuffered & bit(1))>0)?HIGH:LOW;
 		if ((bit(2) & writeMode)>0) digitalInput.p02 = ((writeByteBuffered & bit(2))>0)?HIGH:LOW;
 		if ((bit(3) & writeMode)>0) digitalInput.p03 = ((writeByteBuffered & bit(3))>0)?HIGH:LOW;
@@ -442,7 +428,7 @@ void PCF8575::readBuffer(bool force){
 		if ((bit(5) & writeMode)>0) digitalInput.p05 = ((writeByteBuffered & bit(5))>0)?HIGH:LOW;
 		if ((bit(6) & writeMode)>0) digitalInput.p06 = ((writeByteBuffered & bit(6))>0)?HIGH:LOW;
 		if ((bit(7) & writeMode)>0) digitalInput.p07 = ((writeByteBuffered & bit(7))>0)?HIGH:LOW;
-        if ((bit(8) & writeMode)>0) digitalInput.p10 = ((writeByteBuffered & bit(8))>0)?HIGH:LOW;
+		if ((bit(8) & writeMode)>0) digitalInput.p10 = ((writeByteBuffered & bit(8))>0)?HIGH:LOW;
 		if ((bit(9) & writeMode)>0) digitalInput.p11 = ((writeByteBuffered & bit(9))>0)?HIGH:LOW;
 		if ((bit(10) & writeMode)>0) digitalInput.p12 = ((writeByteBuffered & bit(10))>0)?HIGH:LOW;
 		if ((bit(11) & writeMode)>0) digitalInput.p13 = ((writeByteBuffered & bit(11))>0)?HIGH:LOW;
@@ -450,7 +436,6 @@ void PCF8575::readBuffer(bool force){
 		if ((bit(13) & writeMode)>0) digitalInput.p15 = ((writeByteBuffered & bit(13))>0)?HIGH:LOW;
 		if ((bit(14) & writeMode)>0) digitalInput.p16 = ((writeByteBuffered & bit(14))>0)?HIGH:LOW;
 		if ((bit(15) & writeMode)>0) digitalInput.p17 = ((writeByteBuffered & bit(15))>0)?HIGH:LOW;
-
 #else
 		if ((bit(0) & readMode)>0) digitalInput.p0 = ((byteBuffered & bit(0))>0)?HIGH:LOW;
 		if ((bit(1) & readMode)>0) digitalInput.p1 = ((byteBuffered & bit(1))>0)?HIGH:LOW;
@@ -468,86 +453,56 @@ void PCF8575::readBuffer(bool force){
 		if ((bit(13) & readMode)>0) digitalInput.p13 = ((byteBuffered & bit(13))>0)?HIGH:LOW;
 		if ((bit(14) & readMode)>0) digitalInput.p14 = ((byteBuffered & bit(14))>0)?HIGH:LOW;
 		if ((bit(15) & readMode)>0) digitalInput.p15 = ((byteBuffered & bit(15))>0)?HIGH:LOW;
-
-        if ((bit(0) & writeMode)>0) digitalInput.p0 = ((writeByteBuffered & bit(0))>0)?HIGH:LOW;
-        if ((bit(1) & writeMode)>0) digitalInput.p1 = ((writeByteBuffered & bit(1))>0)?HIGH:LOW;
-        if ((bit(2) & writeMode)>0) digitalInput.p2 = ((writeByteBuffered & bit(2))>0)?HIGH:LOW;
-        if ((bit(3) & writeMode)>0) digitalInput.p3 = ((writeByteBuffered & bit(3))>0)?HIGH:LOW;
-        if ((bit(4) & writeMode)>0) digitalInput.p4 = ((writeByteBuffered & bit(4))>0)?HIGH:LOW;
-        if ((bit(5) & writeMode)>0) digitalInput.p5 = ((writeByteBuffered & bit(5))>0)?HIGH:LOW;
-        if ((bit(6) & writeMode)>0) digitalInput.p6 = ((writeByteBuffered & bit(6))>0)?HIGH:LOW;
-        if ((bit(7) & writeMode)>0) digitalInput.p7 = ((writeByteBuffered & bit(7))>0)?HIGH:LOW;
-        if ((bit(8) & writeMode)>0) digitalInput.p8 = ((writeByteBuffered & bit(8))>0)?HIGH:LOW;
-        if ((bit(9) & writeMode)>0) digitalInput.p9 = ((writeByteBuffered & bit(9))>0)?HIGH:LOW;
-        if ((bit(10) & writeMode)>0) digitalInput.p10 = ((writeByteBuffered & bit(10))>0)?HIGH:LOW;
-        if ((bit(11) & writeMode)>0) digitalInput.p11 = ((writeByteBuffered & bit(11))>0)?HIGH:LOW;
-        if ((bit(12) & writeMode)>0) digitalInput.p12 = ((writeByteBuffered & bit(12))>0)?HIGH:LOW;
-        if ((bit(13) & writeMode)>0) digitalInput.p13 = ((writeByteBuffered & bit(13))>0)?HIGH:LOW;
-        if ((bit(14) & writeMode)>0) digitalInput.p14 = ((writeByteBuffered & bit(14))>0)?HIGH:LOW;
-        if ((bit(15) & writeMode)>0) digitalInput.p15 = ((writeByteBuffered & bit(15))>0)?HIGH:LOW;
-
+		if ((bit(0) & writeMode)>0) digitalInput.p0 = ((writeByteBuffered & bit(0))>0)?HIGH:LOW;
+		if ((bit(1) & writeMode)>0) digitalInput.p1 = ((writeByteBuffered & bit(1))>0)?HIGH:LOW;
+		if ((bit(2) & writeMode)>0) digitalInput.p2 = ((writeByteBuffered & bit(2))>0)?HIGH:LOW;
+		if ((bit(3) & writeMode)>0) digitalInput.p3 = ((writeByteBuffered & bit(3))>0)?HIGH:LOW;
+		if ((bit(4) & writeMode)>0) digitalInput.p4 = ((writeByteBuffered & bit(4))>0)?HIGH:LOW;
+		if ((bit(5) & writeMode)>0) digitalInput.p5 = ((writeByteBuffered & bit(5))>0)?HIGH:LOW;
+		if ((bit(6) & writeMode)>0) digitalInput.p6 = ((writeByteBuffered & bit(6))>0)?HIGH:LOW;
+		if ((bit(7) & writeMode)>0) digitalInput.p7 = ((writeByteBuffered & bit(7))>0)?HIGH:LOW;
+		if ((bit(8) & writeMode)>0) digitalInput.p8 = ((writeByteBuffered & bit(8))>0)?HIGH:LOW;
+		if ((bit(9) & writeMode)>0) digitalInput.p9 = ((writeByteBuffered & bit(9))>0)?HIGH:LOW;
+		if ((bit(10) & writeMode)>0) digitalInput.p10 = ((writeByteBuffered & bit(10))>0)?HIGH:LOW;
+		if ((bit(11) & writeMode)>0) digitalInput.p11 = ((writeByteBuffered & bit(11))>0)?HIGH:LOW;
+		if ((bit(12) & writeMode)>0) digitalInput.p12 = ((writeByteBuffered & bit(12))>0)?HIGH:LOW;
+		if ((bit(13) & writeMode)>0) digitalInput.p13 = ((writeByteBuffered & bit(13))>0)?HIGH:LOW;
+		if ((bit(14) & writeMode)>0) digitalInput.p14 = ((writeByteBuffered & bit(14))>0)?HIGH:LOW;
+		if ((bit(15) & writeMode)>0) digitalInput.p15 = ((writeByteBuffered & bit(15))>0)?HIGH:LOW;
 #endif
-//		if ((readMode & byteBuffered)>0){
-//			byteBuffered = ~readMode & byteBuffered;
-//			DEBUG_PRINT("Buffer hight value readed set readed ");
-//			DEBUG_PRINTLN(byteBuffered, BIN);
-//		}
-		byteBuffered = (initialBuffer & readMode) | (byteBuffered  & ~readMode); //~readMode & byteBuffered;
-
-			DEBUG_PRINT("Buffer hight value readed set readed ");
-			DEBUG_PRINTLN(byteBuffered, BIN);
-
+		DEBUG_PRINT("Buffer value kept ");
+		DEBUG_PRINTLN(byteBuffered, BIN);
 		DEBUG_PRINT("Return value ");
 		return digitalInput;
 	};
 #else
-	/**
-	 * Read value of all INPUT pin in byte format for low memory usage
-	 * Debounce read more fast than 10millis, non managed for interrupt mode
-	 * @return
-	 */
-	uint16_t PCF8575::digitalReadAll(void){
-		DEBUG_PRINTLN("Read from buffer");
-		_wire->requestFrom(_address,(uint8_t)2);// Begin transmission to PCF8575 with the buttons
-		lastReadMillis = millis();
-		if(_wire->available())   // If uint16_ts are available to be recieved
-		{
-			  DEBUG_PRINTLN("Data ready");
-			  uint16_t iInput = _wire->read();// Read a uint16_t
+		/**
+		 * Read value of all INPUT pin in byte format for low memory usage
+		 * Debounce read more fast than 10millis, non managed for interrupt mode
+		 * @return
+		 */
+		uint16_t PCF8575::digitalReadAll(void){
+			DEBUG_PRINTLN("Read from buffer");
+			_wire->requestFrom(_address,(uint8_t)2);// Begin transmission to PCF8575 with the buttons
+			lastReadMillis = millis();
+			if(_wire->available())   // If uint16_ts are available to be recieved
+			{
+				DEBUG_PRINTLN("Data ready");
+				uint16_t iInput = _wire->read();// Read a uint16_t
 				iInput |= _wire->read() << 8;// Read a uint16_t
+				DEBUG_PRINT(" -------- READ INPUTS --------- ");
+				byteBuffered = (byteBuffered & ~readMode) | (((uint16_t)iInput) & readMode);
+			}
 
-//			  if ((iInput & readMode)>0){
-//				  DEBUG_PRINT("Input ");
-//				  DEBUG_PRINTLN((uint16_t)iInput, BIN);
-//
-//				  byteBuffered = byteBuffered | (uint16_t)iInput;
-//				  DEBUG_PRINT("byteBuffered ");
-//				  DEBUG_PRINTLN(byteBuffered, BIN);
-//			  }
-			  if ((readModePullDown & iInput)>0 or (readModePullUp & ~iInput)>0){
-				  DEBUG_PRINT(" -------- CHANGE --------- ");
-				  byteBuffered = (byteBuffered & ~readMode) | (uint16_t)iInput;
-
-			  }
-
-		}
-
-		DEBUG_PRINT("Buffer value ");
-		DEBUG_PRINTLN(byteBuffered, BIN);
-
-		//	uint16_t byteRead = byteBuffered | writeByteBuffered;
-
-		uint16_t byteRead = byteBuffered | writeByteBuffered;
-
-		//if ((byteBuffered & readModePullDown)>0 and (~byteBuffered & readModePullUp)>0){
-		//	byteBuffered = (resetInitial & readMode) | (byteBuffered  & ~readMode); //~readMode & byteBuffered;
-		byteBuffered = (initialBuffer & readMode) | (byteBuffered  & ~readMode); //~readMode & byteBuffered;
-			DEBUG_PRINT("Buffer hight value readed set readed ");
+			DEBUG_PRINT("Buffer value ");
 			DEBUG_PRINTLN(byteBuffered, BIN);
 
-		DEBUG_PRINT("Return value ");
-		return byteRead;
-	};
+			uint16_t byteRead = byteBuffered | writeByteBuffered;
+			DEBUG_PRINT("Buffer value kept ");
+			DEBUG_PRINTLN(byteBuffered, BIN);
+			DEBUG_PRINT("Return value ");
+			return byteRead;
+		};
 #endif
 
 /**
@@ -557,57 +512,37 @@ void PCF8575::readBuffer(bool force){
  * @return
  */
 	uint8_t PCF8575::digitalRead(uint8_t pin, bool forceReadNow){
-		uint8_t value = (bit(pin) & readModePullUp)?HIGH:LOW;
+		uint8_t value = LOW;
 		DEBUG_PRINT("Read pin ");
-		DEBUG_PRINT (pin);
-		// Check if pin already HIGH than read and prevent reread of i2c
-	//	DEBUG_PRINTLN("----------------------------------")
-	//	DEBUG_PRINT("readModePullUp   ");
-	//	DEBUG_PRINTLN(readModePullUp, BIN);
-	//	DEBUG_PRINT("readModePullDown ");
-	//	DEBUG_PRINTLN(readModePullDown, BIN);
-	//	DEBUG_PRINT("byteBuffered     ");
-	//	DEBUG_PRINTLN(byteBuffered, BIN);
+		DEBUG_PRINT(pin);
 
-
-		if ((((bit(pin) & (readModePullDown & byteBuffered))>0) or (bit(pin) & (readModePullUp & ~byteBuffered))>0 )){
-			DEBUG_PRINTLN(" ...Pin already set");
-			  if ((bit(pin) & byteBuffered)>0){
-				  value = HIGH;
-			  }else{
-				  value = LOW;
-			  }
-		 }else if (forceReadNow || (millis() > PCF8575::lastReadMillis+latency)){
-			 DEBUG_PRINT(" ...Read from buffer... ");
-			  _wire->requestFrom(_address,(uint8_t)2);// Begin transmission to PCF8574 with the buttons
-			  lastReadMillis = millis();
-			  if(_wire->available())   // If bytes are available to be recieved
-			  {
-				  DEBUG_PRINTLN(" Data ready");
-			  uint16_t iInput = _wire->read();// Read a uint16_t
+		// Always refresh when asked or after the debounce interval so LOW transitions
+		// on externally pulled-up INPUT pins are not ignored.
+		if (forceReadNow || (millis() > PCF8575::lastReadMillis+latency)){
+			DEBUG_PRINT(" ...Read from buffer... ");
+			_wire->requestFrom(_address,(uint8_t)2);// Begin transmission to PCF8574 with the buttons
+			lastReadMillis = millis();
+			if(_wire->available())   // If bytes are available to be recieved
+			{
+				DEBUG_PRINTLN(" Data ready");
+				uint16_t iInput = _wire->read();// Read a uint16_t
 				iInput |= _wire->read() << 8;// Read a uint16_t
-				  DEBUG_PRINT("Input ");
-				  DEBUG_PRINTLN((uint16_t)iInput, BIN);
-
-				  if ((readModePullDown & iInput)>0 or (readModePullUp & ~iInput)>0){
-					  DEBUG_PRINT(" -------- CHANGE --------- ");
-					  byteBuffered = (byteBuffered & ~readMode) | (uint16_t)iInput;
-					  if ((bit(pin) & byteBuffered)>0){
-						  value = HIGH;
-					  }else{
-						  value = LOW;
-					  }
-	//				  value = (bit(pin) & byteBuffered);
-				  }
-			  }
+				DEBUG_PRINT("Input ");
+				DEBUG_PRINTLN((uint16_t)iInput, BIN);
+				DEBUG_PRINT(" -------- READ INPUT --------- ");
+				byteBuffered = (byteBuffered & ~readMode) | (((uint16_t)iInput) & readMode);
+			}
 		}
+
 		DEBUG_PRINT(" ..Buffer value ");
 		DEBUG_PRINT(byteBuffered, BIN);
-		// Keep the buffered state stable: digitalRead() must return the current pin level,
-		// not consume it like an edge/event flag.
-		if(bit(pin) & writeByteBuffered){
-			value = HIGH;
+
+		if ((bit(pin) & writeMode)>0){
+			value = ((bit(pin) & writeByteBuffered)>0)?HIGH:LOW;
+		}else{
+			value = ((bit(pin) & byteBuffered)>0)?HIGH:LOW;
 		}
+
 		DEBUG_PRINT(" ...Return value ");
 		DEBUG_PRINTLN(value);
 		return value;
